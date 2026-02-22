@@ -1,32 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './MovieHome.css';
-import Poster1 from '../assets/acc.jpg'
-import Poster2 from '../assets/ave-1.jpg'
-import Poster3 from '../assets/avengers.jpg'
-import Poster4 from '../assets/batman.jpg'
-import Poster5 from '../assets/ing.jpg'
-import Poster6 from '../assets/pulp-1.jpg'
-import Poster7 from '../assets/rubysparks.jpg'
-import Poster8 from '../assets/youuuu.jpeg'
 import { useNavigate } from 'react-router-dom';
+import { movieAPI } from '../services/api'; 
 
 export default function MovieHome() {
-  const navigate = useNavigate()
-  const handleLogin = () =>{
-    navigate('/watchlist')
-  }
+  const navigate = useNavigate();
+
+  const [movies, setMovies] = useState([]);
+  
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState('asc'); 
+
+  const handleLogin = () => {
+    navigate('/watchlist');
+  };
 
 
-  const [movies] = useState([
-    { id: 1, title: 'Spider-Man: Accross The Spider-Verse', poster: Poster1 },
-    { id: 2, title: 'Avengers: Infinity War', poster: Poster2 },
-    { id: 3, title: 'Avengers: Endgame', poster: Poster3 },
-    { id: 4, title: 'The Batman', poster: Poster4 },
-    { id: 5, title: 'Inglorious Basterds', poster: Poster5 },
-    { id: 6, title: 'Pulp-Fiction', poster: Poster6 },
-    { id: 7, title: 'Ruby Sparks', poster: Poster7 },
-    { id: 8, title: 'You Are the Apple of My Eye', poster: Poster8 },
-  ]);
+  useEffect(() => {
+    fetchMovies();
+  }, [searchQuery, sortOrder]);
+
+  const fetchMovies = async () => {
+    try {
+    
+      const response = await movieAPI.getAllMovies({
+        search: searchQuery,
+        sort: sortOrder
+      });
+      setMovies(response.data);
+    } catch (error) {
+      console.error('Error fetching movies:', error);
+    }
+  };
 
   return (
     <div className="movie-container">
@@ -35,21 +41,48 @@ export default function MovieHome() {
         <button onClick={handleLogin} className='my-list'>WatchList</button>
       </header>
 
+      {/* === UI BARU UNTUK FILTER, SEARCH & SORT === */}
+      <div className="filters-container" style={{ margin: '20px 0', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+        <input 
+          type="text" 
+          placeholder="Cari judul film..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ padding: '10px', borderRadius: '4px', border: 'none', width: '250px' }}
+        />
+        <select 
+          value={sortOrder} 
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ padding: '10px', borderRadius: '4px', border: 'none' }}
+        >
+          <option value="asc">Urutkan: A - Z</option>
+          <option value="desc">Urutkan: Z - A</option>
+        </select>
+      </div>
+      {/* ========================================= */}
+
       <div className="movie-grid">
-        {movies.map((movie) => (
-          <div key={movie.id} className="movie-card">
-            <div className="movie-poster">
-              {movie.poster ? (
-                <img src={movie.poster} alt={movie.title} className="movie-img" />
-              ) : (
-                <div className="movie-placeholder">
-                  <p className="movie-placeholder-text">Add Poster</p>
-                </div>
-              )}
+
+        {movies.length > 0 ? (
+          movies.map((movie) => (
+            <div key={movie.id} className="movie-card">
+              <div className="movie-poster">
+                {movie.poster ? (
+                  <img src={movie.poster} alt={movie.title} className="movie-img" />
+                ) : (
+                  <div className="movie-placeholder">
+                    <p className="movie-placeholder-text">Add Poster</p>
+                  </div>
+                )}
+              </div>
+              <h3 className="movie-title">{movie.title}</h3>
             </div>
-            <h3 className="movie-title">{movie.title}</h3>
-          </div>
-        ))}
+          ))
+        ) : (
+          <p style={{ color: 'white', textAlign: 'center', width: '100%' }}>
+            {searchQuery ? `Film "${searchQuery}" tidak ditemukan.` : 'Belum ada film di database.'}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { movieAPI } from '../services/api';
+import { movieAPI } from '../services/api'; 
 import './MovieHome.css';
 
 export default function MovieHome() {
@@ -12,20 +12,34 @@ export default function MovieHome() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // fetch movies on mount ---
+
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login'); 
+      return; 
+    }
     fetchMovies();
-  }, []);
+  }, [navigate]);
+
+  const handleError = (err, defaultMessage) => {
+    console.error(err);
+    if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+      localStorage.removeItem('token');
+      navigate('/login');
+    } else {
+      setError(defaultMessage);
+    }
+  };
 
   const fetchMovies = async () => {
     try {
       setLoading(true);
       setError('');
       const response = await movieAPI.getAllMovies();
-      setMovies(response.data);
+      setMovies(response.data); 
     } catch (error) {
-      console.error('Error fetching movies:', error);
-      setError('Failed to load movies. Make sure the server is running.');
+      handleError(error, 'Failed to load movies. Make sure the server is running.');
     } finally {
       setLoading(false);
     }
@@ -46,8 +60,7 @@ export default function MovieHome() {
       setShowForm(false);
       setError('');
     } catch (error) {
-      console.error('Error adding movie:', error);
-      setError('Failed to add movie');
+      handleError(error, 'Failed to add movie');
     }
   };
 
@@ -69,8 +82,7 @@ export default function MovieHome() {
       setShowForm(false);
       setError('');
     } catch (error) {
-      console.error('Error updating movie:', error);
-      setError('Failed to update movie');
+      handleError(error, 'Failed to update movie');
     }
   };
 
@@ -82,8 +94,7 @@ export default function MovieHome() {
         setMovies(movies.filter(movie => movie.id !== id));
         setError('');
       } catch (error) {
-        console.error('Error deleting movie:', error);
-        setError('Failed to delete movie');
+        handleError(error, 'Failed to delete movie');
       }
     }
   };
@@ -100,6 +111,11 @@ export default function MovieHome() {
     setShowForm(false);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
   if (loading) {
     return <div className="loading">Loading movies...</div>;
   }
@@ -110,9 +126,14 @@ export default function MovieHome() {
         <button onClick={() => navigate('/movies')} className="movie-header-title">
           Chill
         </button>
-        <button className="add-movie-btn" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : '+ Add Movie'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="add-movie-btn" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : '+ Add Movie'}
+            </button>
+            <button onClick={handleLogout} style={{ backgroundColor: '#ff4d4f', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Logout
+            </button>
+        </div>
       </header>
 
       {error && <div className="error-message">{error}</div>}

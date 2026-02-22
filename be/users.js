@@ -4,12 +4,34 @@ const knexConfig = require('./knexfile').development;
 const knex = require('knex')(knexConfig);
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer'); 
+const { v4: uuidv4 } = require('uuid'); 
 
 require('dotenv').config(); 
-
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// REGISTER
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER, 
+    pass: process.env.EMAIL_PASS  
+  }
+});
+
+const sendVerificationEmail = async (userEmail, token) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: userEmail,
+    subject: 'Verifikasi Akun Movie App Anda',
+    text: `Halo! Silakan verifikasi akun Anda dengan menggunakan token ini: ${token} \nAtau klik link: http://localhost:3000/users/verifikasi-email?token=${token}`
+  };
+  await transporter.sendMail(mailOptions);
+};
+
+const authMiddleware = require('./middleware/auth');
+
+
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -18,7 +40,6 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // cek user/email sudah ada
     const exists = await knex('users')
       .where('email', email)
       .orWhere('username', username)
@@ -29,20 +50,61 @@ router.post('/register', async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
+    
 
+    const verification_token = uuidv4();
+
+  
     const [newUser] = await knex('users')
-      .insert({ username, email, password_hash })
+      .insert({ 
+        username, 
+        email, 
+        password_hash, 
+        verification_token, 
+        is_verified: false 
+      })
       .returning(['id', 'username', 'email']);
 
-    res.status(201).json(newUser);
+
+    await sendVerificationEmail(email, verification_token);
+
+    res.status(201).json({ 
+      message: 'Registrasi berhasil. Silakan cek email untuk verifikasi.', 
+      user: newUser 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// LOGIN
-router.post('/login', async (req, res) => {
+
+router.get('/verifikasi-email', async (req, res) => {
   try {
+    const { token } = req.query; 
+
+    if (!token) {
+      return res.status(400).json({ message: "Token tidak disediakan" });
+    }
+
+   
+    const user = await knex('users').where({ verification_token: token }).first();
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid Verification Token" });
+    }
+
+    await knex('users')
+      .where({ id: user.id })
+      .update({ is_verified: true, verification_token: null });
+
+    res.status(200).json({ message: "Email Verified Successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/login', async (req, res) => {
+    try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
 
@@ -60,23 +122,8 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// dapetin semua user
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
-
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // {id, email}
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
 router.get('/', authMiddleware, async (req, res) => {
-  try {
+     try {
     const users = await knex('users').select('id', 'username', 'email', 'created_at', 'updated_at');
     res.json(users);
   } catch (err) {
@@ -84,5 +131,4 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router;
-
+module.exports = { router, authMiddleware };

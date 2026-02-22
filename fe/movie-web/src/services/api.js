@@ -2,13 +2,31 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:3000';
 
+
+const api = axios.create({
+  baseURL: API_URL
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+
 export const movieAPI = {
-  getAllMovies: () => axios.get(`${API_URL}/movies`),
-  getMovie: (id) => axios.get(`${API_URL}/movies/${id}`),
-  createMovie: (movieData) => axios.post(`${API_URL}/movies`, movieData),
-  updateMovie: (id, movieData) => axios.put(`${API_URL}/movies/${id}`, movieData),
-  deleteMovie: (id) => axios.delete(`${API_URL}/movies/${id}`)
+  getAllMovies: () => api.get('/movies'),
+  getMovie: (id) => api.get(`/movies/${id}`),
+  createMovie: (movieData) => api.post('/movies', movieData),
+  updateMovie: (id, movieData) => api.put(`/movies/${id}`, movieData),
+  getAllMovies: (params) => axios.get(`${API_URL}/movies`, { params }),
+  deleteMovie: (id) => api.delete(`/movies/${id}`)
 };
+
 
 export const authAPI = {
   register: (userData) => axios.post(`${API_URL}/users/register`, userData),
